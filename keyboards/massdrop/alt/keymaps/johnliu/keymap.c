@@ -106,6 +106,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 #define MODS_CTRL  (get_mods() & MOD_BIT(KC_LCTL) || get_mods() & MOD_BIT(KC_RCTRL))
 #define MODS_ALT  (get_mods() & MOD_BIT(KC_LALT) || get_mods() & MOD_BIT(KC_RALT))
 
+#define FOLLOW_TIMEOUT 3000
 bool is_follow_held = false;
 uint16_t follow_timer = 0;
 
@@ -116,7 +117,7 @@ void matrix_init_user(void) {
 // Runs constantly in the background, in a loop.
 void matrix_scan_user(void) {
     if (is_follow_held) {
-        if (timer_elapsed(follow_timer) >= 5000) {
+        if (timer_elapsed(follow_timer) >= FOLLOW_TIMEOUT) {
             SEND_CMD("u");
             is_follow_held = false;
         }
@@ -201,7 +202,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     follow_timer = timer_read();
                 }
             } else {
-                if (timer_elapsed(follow_timer) < 5000) {
+                if (timer_elapsed(follow_timer) < FOLLOW_TIMEOUT) {
                     SEND_CMD("2");
                 }
                 is_follow_held = false;
