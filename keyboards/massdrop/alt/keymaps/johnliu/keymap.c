@@ -107,8 +107,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 #define MODS_ALT  (get_mods() & MOD_BIT(KC_LALT) || get_mods() & MOD_BIT(KC_RALT))
 
 #define FOLLOW_TIMEOUT 2000
-bool is_follow_held = false;
-uint16_t follow_timer = 0;
+#define SWITCH_TIMEOUT 300
+
+bool is_pc2_held = false;
+uint16_t pc1_timer = 0;
+uint16_t pc2_timer = 0;
 
 // Runs just one time when the keyboard initializes.
 void matrix_init_user(void) {
@@ -116,10 +119,10 @@ void matrix_init_user(void) {
 
 // Runs constantly in the background, in a loop.
 void matrix_scan_user(void) {
-    if (is_follow_held) {
-        if (timer_elapsed(follow_timer) >= FOLLOW_TIMEOUT) {
+    if (is_pc2_held) {
+        if (timer_elapsed(pc2_timer) >= FOLLOW_TIMEOUT) {
             SEND_CMD("u");
-            is_follow_held = false;
+            is_pc2_held = false;
         }
     }
 };
@@ -191,21 +194,25 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
         case PC1:
-            if (!record->event.pressed) {
-                SEND_CMD("1");
+            if (record->event.pressed) {
+                pc1_timer = timer_read();
+            } else {
+                if (timer_elapsed(pc1_timer) >= SWITCH_TIMEOUT) {
+                    SEND_CMD("1");
+                }
             }
             return false;
         case PC2:
             if (record->event.pressed) {
-                if (!is_follow_held) {
-                    is_follow_held = true;
-                    follow_timer = timer_read();
+                if (!is_pc2_held) {
+                    is_pc2_held = true;
+                    pc2_timer = timer_read();
                 }
             } else {
-                if (timer_elapsed(follow_timer) < FOLLOW_TIMEOUT) {
+                if (timer_elapsed(pc2_timer) >= SWITCH_TIMEOUT && timer_elapsed(pc2_timer) < FOLLOW_TIMEOUT) {
                     SEND_CMD("2");
                 }
-                is_follow_held = false;
+                is_pc2_held = false;
             }
             return false;
         default:
