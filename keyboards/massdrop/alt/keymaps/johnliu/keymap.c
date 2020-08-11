@@ -1,7 +1,7 @@
 #include QMK_KEYBOARD_H
 
 enum keycodes {
-    PC1,
+    PC1 = SAFE_RANGE,
     PC2
 };
 
@@ -112,13 +112,12 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             rgb_matrix_sethsv(rgb_matrix_get_hue(), rgb_matrix_get_sat(), 128);
             break;
         case OFF:
-            rgb_matrix_config.speed = 64;
+            rgb_matrix_config.speed = 96;
             rgb_matrix_set_flags(LED_FLAG_KEYLIGHT);
             rgb_matrix_set_color_all(0, 0, 0);
 
             rgb_matrix_set_flags(LED_FLAG_UNDERGLOW);
-            rgb_matrix_sethsv(HSV_WHITE);
-
+            rgb_matrix_sethsv(rgb_matrix_get_hue(), rgb_matrix_get_sat(), 96);
             rgb_matrix_mode(RGB_MATRIX_BREATHING);
             break;
     }
