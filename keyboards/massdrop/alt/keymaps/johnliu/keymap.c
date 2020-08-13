@@ -2,14 +2,23 @@
 
 enum keycodes {
     PC1 = SAFE_RANGE,
-    PC2
+    PC2,
 };
 
 enum layers {
     NIL,
     FN,
     META,
-    OFF
+    OFF,
+};
+
+enum tap_states {
+    SINGLE_TAP,
+    SINGLE_HOLD,
+};
+
+enum tap_dances {
+  RCMD,
 };
 
 #define RGB_MATRIX_MAXIMUM_BRIGHTNESS 255
@@ -26,7 +35,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,     KC_LBRC, KC_RBRC, KC_BSLS, KC_PGDN, \
         KC_CAPS, KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN,  KC_QUOT,          KC_ENT,  PC1,     \
         KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,  KC_RSFT,          KC_UP,   PC2,     \
-        KC_LCTL, KC_LALT, KC_LGUI,                            KC_SPC,                             TO(META), MO(FN),  KC_LEFT, KC_DOWN, KC_RGHT  \
+        KC_LCTL, KC_LALT, KC_LGUI,                            KC_SPC,                             TD(RCMD), MO(FN),  KC_LEFT, KC_DOWN, KC_RGHT  \
     ),
     [FN] = LAYOUT(
         KC_GRV,  KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  _______, KC_MPLY, \
@@ -72,6 +81,33 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 bool is_pc2_held = false;
 uint16_t pc1_timer = 0;
 uint16_t pc2_timer = 0;
+
+uint8_t get_dance_type(qk_tap_dance_state_t *state) {
+    if (state->count == 1) {
+        if (!state->pressed) return SINGLE_TAP;
+        else return SINGLE_HOLD;
+    }
+    return 2;
+}
+
+void handle_dance(qk_tap_dance_state_t *state, void *user_data) {
+    switch (get_dance_type(state)) {
+        case SINGLE_TAP:
+            layer_on(META);
+            break;
+        case SINGLE_HOLD:
+            register_code(KC_LGUI);
+            break;
+    }
+}
+
+void handle_dance_reset(qk_tap_dance_state_t *state, void *user_data) {
+    unregister_code(KC_LGUI);
+}
+
+qk_tap_dance_action_t tap_dance_actions[] = {
+    [RCMD] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, handle_dance, handle_dance_reset),
+};
 
 void rgb_init(void) {
     rgb_matrix_set_flags(LED_FLAG_ALL);
