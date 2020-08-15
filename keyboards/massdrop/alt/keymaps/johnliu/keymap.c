@@ -89,11 +89,11 @@ uint8_t get_dance_type(qk_tap_dance_state_t *state) {
 
 void handle_dance(qk_tap_dance_state_t *state, void *user_data) {
     switch (get_dance_type(state)) {
-        case SINGLE_TAP:
-            layer_on(OFF);
-            break;
         case SINGLE_HOLD:
             register_code(KC_RGUI);
+            break;
+        default:
+            layer_on(OFF);
             break;
     }
 }
@@ -159,6 +159,16 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
+        case KC_GESC:
+            if (record->event.pressed) {
+                if (!is_reset_held) {
+                    is_reset_held = true;
+                    reset_timer = timer_read();
+                }
+            } else {
+                is_reset_held = false;
+            }
+            return true;
         case PC1:
             if (record->event.pressed) {
                 pc1_timer = timer_read();
@@ -187,12 +197,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     is_reset_held = false;
                     register_code(KC_RSFT);
                     register_code(KC_SPC);
-                } else if (!is_reset_held) {
-                    is_reset_held = true;
-                    reset_timer = timer_read();
                 }
             } else {
-                is_reset_held = false;
                 unregister_code(KC_SPC);
                 unregister_code(KC_RSFT);
                 if (!(get_mods() & MOD_BIT(KC_RGUI))) {
@@ -201,7 +207,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return true;
         case PTT:
-            is_reset_held = false;
             if (record->event.pressed) {
                 register_code(KC_RGUI);
                 register_code(KC_RSFT);
