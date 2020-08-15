@@ -9,7 +9,7 @@ enum keycodes {
 enum layers {
     NIL,
     FN,
-    FN_TOG,
+    PTT_LAYER,
     OFF,
 };
 
@@ -45,6 +45,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          KC_VOLU, _______, \
         _______, _______, _______,                            _______,                            PTT,     _______, KC_MPRV, KC_VOLD, KC_MNXT  \
     ),
+    [PTT_LAYER] = LAYOUT(
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          _______, _______, \
+        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          _______, _______, \
+        _______, _______, _______,                            _______,                            _______, _______, _______, _______, _______  \
+    ),
     [OFF] = LAYOUT(
         XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, \
         XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, \
@@ -75,6 +82,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 bool is_pc2_held = false;
 bool is_reset_held = false;
+bool is_ptt_enabled = false;
 uint16_t pc1_timer = 0;
 uint16_t pc2_timer = 0;
 uint16_t reset_timer = 0;
@@ -89,16 +97,22 @@ uint8_t get_dance_type(qk_tap_dance_state_t *state) {
 
 void handle_dance(qk_tap_dance_state_t *state, void *user_data) {
     switch (get_dance_type(state)) {
+        case SINGLE_TAP:
+            layer_on(OFF);
+            break;
         case SINGLE_HOLD:
             register_code(KC_RGUI);
-            break;
-        default:
-            layer_on(OFF);
             break;
     }
 }
 
 void handle_dance_reset(qk_tap_dance_state_t *state, void *user_data) {
+    if (is_ptt_enabled) {
+        is_ptt_enabled = false;
+        unregister_code(KC_SPC);
+        unregister_code(KC_RSFT);
+        layer_off(PTT_LAYER);
+    }
     unregister_code(KC_RGUI);
 }
 
@@ -135,14 +149,15 @@ void matrix_scan_user(void) {
 };
 
 layer_state_t layer_state_set_user(layer_state_t state) {
+    rgb_init();
     switch (get_highest_layer(state)) {
         case NIL:
-            rgb_init();
             break;
         case FN:
-            rgb_matrix_set_flags(LED_FLAG_ALL);
-            rgb_matrix_mode(RGB_MATRIX_STARTUP_MODE);
             rgb_matrix_sethsv(rgb_matrix_get_hue(), rgb_matrix_get_sat(), RGB_MATRIX_MAXIMUM_BRIGHTNESS);
+            break;
+        case PTT_LAYER:
+            rgb_matrix_sethsv(64, 160, RGB_MATRIX_MAXIMUM_BRIGHTNESS);
             break;
         case OFF:
             rgb_matrix_config.speed = 96;
@@ -194,27 +209,34 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         case MO(FN):
             if (record->event.pressed) {
                 if (get_mods() & MOD_BIT(KC_RGUI)) {
-                    is_reset_held = false;
+                    is_ptt_enabled = true;
                     register_code(KC_RSFT);
                     register_code(KC_SPC);
+                    layer_on(PTT_LAYER);
                 }
             } else {
+                is_ptt_enabled = false;
                 unregister_code(KC_SPC);
                 unregister_code(KC_RSFT);
                 if (!(get_mods() & MOD_BIT(KC_RGUI))) {
                     unregister_code(KC_RGUI);
                 }
+                layer_off(PTT_LAYER);
             }
             return true;
         case PTT:
             if (record->event.pressed) {
+                is_ptt_enabled = true;
                 register_code(KC_RGUI);
                 register_code(KC_RSFT);
                 register_code(KC_SPC);
+                layer_on(PTT_LAYER);
             } else {
+                is_ptt_enabled = false;
                 unregister_code(KC_SPC);
                 unregister_code(KC_RSFT);
                 unregister_code(KC_RGUI);
+                layer_off(PTT_LAYER);
             }
             return false;
         default:
