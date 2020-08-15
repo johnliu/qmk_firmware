@@ -3,12 +3,13 @@
 enum keycodes {
     PC1 = SAFE_RANGE,
     PC2,
+    PTT,
 };
 
 enum layers {
     NIL,
     FN,
-    META,
+    FN_TOG,
     OFF,
 };
 
@@ -42,14 +43,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, \
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          _______, _______, \
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,          KC_VOLU, _______, \
-        _______, _______, _______,                            _______,                            _______, _______, KC_MPRV, KC_VOLD, KC_MNXT  \
-    ),
-    [META] = LAYOUT(
-        TO(NIL), XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, RESET,   \
-        XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, NK_TOGG, \
-        XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,          XXXXXXX, XXXXXXX, \
-        XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX,          XXXXXXX, RGB_TOG, \
-        XXXXXXX, XXXXXXX, XXXXXXX,                            XXXXXXX,                            TO(OFF), XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX  \
+        _______, _______, _______,                            _______,                            PTT,     _______, KC_MPRV, KC_VOLD, KC_MNXT  \
     ),
     [OFF] = LAYOUT(
         XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, XXXXXXX, \
@@ -76,11 +70,14 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 #define MODS_ALT  (get_mods() & MOD_BIT(KC_LALT) || get_mods() & MOD_BIT(KC_RALT))
 
 #define FOLLOW_TIMEOUT 2000
+#define RESET_TIMEOUT 5000
 #define SWITCH_TIMEOUT 300
 
 bool is_pc2_held = false;
+bool is_reset_held = false;
 uint16_t pc1_timer = 0;
 uint16_t pc2_timer = 0;
+uint16_t reset_timer = 0;
 
 uint8_t get_dance_type(qk_tap_dance_state_t *state) {
     if (state->count == 1) {
@@ -93,16 +90,16 @@ uint8_t get_dance_type(qk_tap_dance_state_t *state) {
 void handle_dance(qk_tap_dance_state_t *state, void *user_data) {
     switch (get_dance_type(state)) {
         case SINGLE_TAP:
-            layer_on(META);
+            layer_on(OFF);
             break;
         case SINGLE_HOLD:
-            register_code(KC_LGUI);
+            register_code(KC_RGUI);
             break;
     }
 }
 
 void handle_dance_reset(qk_tap_dance_state_t *state, void *user_data) {
-    unregister_code(KC_LGUI);
+    unregister_code(KC_RGUI);
 }
 
 qk_tap_dance_action_t tap_dance_actions[] = {
@@ -126,8 +123,13 @@ void matrix_init_user(void) {
 void matrix_scan_user(void) {
     if (is_pc2_held) {
         if (timer_elapsed(pc2_timer) >= FOLLOW_TIMEOUT) {
-            SEND_CMD("u");
             is_pc2_held = false;
+            SEND_CMD("u");
+        }
+    } else if (is_reset_held) {
+        if (timer_elapsed(reset_timer) >= RESET_TIMEOUT) {
+            is_reset_held = false;
+            reset_keyboard();
         }
     }
 };
@@ -141,11 +143,6 @@ layer_state_t layer_state_set_user(layer_state_t state) {
             rgb_matrix_set_flags(LED_FLAG_ALL);
             rgb_matrix_mode(RGB_MATRIX_STARTUP_MODE);
             rgb_matrix_sethsv(rgb_matrix_get_hue(), rgb_matrix_get_sat(), RGB_MATRIX_MAXIMUM_BRIGHTNESS);
-            break;
-        case META:
-            rgb_matrix_set_flags(LED_FLAG_ALL);
-            rgb_matrix_mode(RGB_MATRIX_STARTUP_MODE);
-            rgb_matrix_sethsv(rgb_matrix_get_hue(), rgb_matrix_get_sat(), 128);
             break;
         case OFF:
             rgb_matrix_config.speed = 96;
@@ -182,6 +179,37 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
                     SEND_CMD("2");
                 }
                 is_pc2_held = false;
+            }
+            return false;
+        case MO(FN):
+            if (record->event.pressed) {
+                if (get_mods() & MOD_BIT(KC_RGUI)) {
+                    is_reset_held = false;
+                    register_code(KC_RSFT);
+                    register_code(KC_SPC);
+                } else if (!is_reset_held) {
+                    is_reset_held = true;
+                    reset_timer = timer_read();
+                }
+            } else {
+                is_reset_held = false;
+                unregister_code(KC_SPC);
+                unregister_code(KC_RSFT);
+                if (!(get_mods() & MOD_BIT(KC_RGUI))) {
+                    unregister_code(KC_RGUI);
+                }
+            }
+            return true;
+        case PTT:
+            is_reset_held = false;
+            if (record->event.pressed) {
+                register_code(KC_RGUI);
+                register_code(KC_RSFT);
+                register_code(KC_SPC);
+            } else {
+                unregister_code(KC_SPC);
+                unregister_code(KC_RSFT);
+                unregister_code(KC_RGUI);
             }
             return false;
         default:
